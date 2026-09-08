@@ -19,19 +19,15 @@ type Image struct {
 
 type Source interface {
 	Name() string
-	FetchImage(cxt context.Context, dstDir string) (*Image, error)
+	Fetch(ctx context.Context, dstDir string) (*Image, error)
 }
 
 type Store interface {
-	SaveImage(image *Image) error
-	GetImage(id string) (*Image, error)
-	GetIDfromAlias(alias string) (*Image, error)
-	ListImages(limit int, offset int, favs bool) ([]*Image, error)
-	DeleteImage(id string) error
-	DeleteImages(ids []string) error
+	Save(img *Image) error
+	Get(identifier string) (*Image, error)
+	List(limit int, favs bool) ([]Image, error)
 	MarkFavorite(id string, alias string) error
-	Exists(id string) (bool, error)
-	GetCurrentImage() (*Image, error)
+	Exists(id string) bool
+	Current() (*Image, error)
 	Shift(step int, favs bool) (*Image, error)
-	ExportImage(id string, dstPath string) error
 }
