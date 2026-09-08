@@ -89,7 +89,7 @@ func (src *BingSource) FetchBatch(ctx context.Context, dstDir string, count int)
 		if len(hsh) > 8 {
 			hsh = hsh[:8]
 		} else if hsh == "" {
-			hsh = GenerateID(img.URL)
+			hsh = generateID(img.URL)
 		}
 
 		t, err := time.Parse("20060102", img.Startdate)
