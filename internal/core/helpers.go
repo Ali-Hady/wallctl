@@ -41,7 +41,7 @@ func downloadImage(client *http.Client, ctx context.Context, absoluteURL, filepa
 	return nil
 }
 
-// GenerateID produces a short, predictable 8-character hex hash.
+// generateID produces a short, predictable 8-character hex hash.
 func generateID(seed string) string {
 	hash := sha256.Sum256([]byte(seed))
 	return hex.EncodeToString(hash[:])[:8]

@@ -1,7 +1,10 @@
 package core
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 )
 
 type Data struct {
@@ -12,6 +15,41 @@ type Data struct {
 type JSONStore struct {
 	FilePath string
 	Data     *Data
+}
+
+func (s *JSONStore) persist() error {
+	sDir := filepath.Dir(s.FilePath)
+	if err := os.MkdirAll(sDir, 0755); err != nil {
+		return fmt.Errorf("creating store directory: %w", err)
+	}
+
+	index, err := os.CreateTemp(sDir, "index-*.tmp")
+	if err != nil {
+		return fmt.Errorf("creating temp file: %w", err)
+	}
+
+	marshalData, err := json.MarshalIndent(s.Data, "", "  ")
+	if err != nil {
+		index.Close()
+		_ = os.Remove(index.Name())
+		return fmt.Errorf("marshalling data: %w", err)
+	}
+
+	if _, err := index.Write(marshalData); err != nil {
+		index.Close()
+		_ = os.Remove(index.Name())
+		return fmt.Errorf("writing to temp file: %w", err)
+	}
+
+	index.Sync()
+	index.Close()
+
+	if err := os.Rename(index.Name(), s.FilePath); err != nil {
+		_ = os.Remove(index.Name())
+		return fmt.Errorf("replacing original file with the new index: %w", err)
+	}
+
+	return nil
 }
 
 func (s *JSONStore) Save(img *Image) error {
@@ -27,12 +65,18 @@ func (s *JSONStore) Save(img *Image) error {
 			s.Data.Images[i].Alias = alias
 			s.Data.Images[i].Favorite = favorite
 			s.Data.CurID = img.ID
+			if err := s.persist(); err != nil {
+				return fmt.Errorf("persisting data: %w", err)
+			}
 			return nil
 		}
 	}
 
 	s.Data.Images = append(s.Data.Images, *img)
 	s.Data.CurID = img.ID
+	if err := s.persist(); err != nil {
+		return fmt.Errorf("persisting data: %w", err)
+	}
 	return nil
 }
 
@@ -42,7 +86,8 @@ func (s *JSONStore) Get(identifier string) (*Image, error) {
 	}
 	for i := range s.Data.Images {
 		if s.Data.Images[i].ID == identifier || s.Data.Images[i].Alias == identifier {
-			return &s.Data.Images[i], nil
+			img := s.Data.Images[i]
+			return &img, nil
 		}
 	}
 
@@ -66,16 +111,20 @@ func (s *JSONStore) MarkFavorite(id string, alias string) error {
 		}
 	}
 
-	img, err := s.Get(id)
-	if err != nil {
-		return err
+	for i := range s.Data.Images {
+		if s.Data.Images[i].ID == id {
+			s.Data.Images[i].Favorite = true
+			if alias != "" {
+				s.Data.Images[i].Alias = alias
+			}
+			if err := s.persist(); err != nil {
+				return fmt.Errorf("persisting data: %w", err)
+			}
+			return nil
+		}
 	}
 
-	img.Favorite = true
-	if alias != "" {
-		img.Alias = alias
-	}
-	return nil
+	return fmt.Errorf("image with ID %q not found", id)
 }
 
 func (s *JSONStore) Exists(id string) bool {
@@ -118,8 +167,35 @@ func (s *JSONStore) Shift(step int, favs bool) (*Image, error) {
 		}
 		if !favs || s.Data.Images[newIndex].Favorite {
 			s.Data.CurID = s.Data.Images[newIndex].ID
-			return &s.Data.Images[newIndex], nil
+			if err := s.persist(); err != nil {
+				return nil, fmt.Errorf("persisting data: %w", err)
+			}
+			img := s.Data.Images[newIndex]
+			return &img, nil
 		}
 		newIndex += step
 	}
+}
+
+func NewJSONStore(filePath string) (*JSONStore, error) {
+	file, err := os.ReadFile(filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return &JSONStore{
+				FilePath: filePath,
+				Data:     &Data{},
+			}, nil
+		}
+		return nil, fmt.Errorf("reading store file: %w", err)
+	}
+
+	var data Data
+	if err := json.Unmarshal(file, &data); err != nil {
+		return nil, fmt.Errorf("unmarshalling store data: %w", err)
+	}
+
+	return &JSONStore{
+		FilePath: filePath,
+		Data:     &data,
+	}, nil
 }
