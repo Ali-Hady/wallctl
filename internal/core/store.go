@@ -52,32 +52,47 @@ func (s *JSONStore) persist() error {
 	return nil
 }
 
-func (s *JSONStore) Save(img *Image) error {
+func (s *JSONStore) update(img *Image) (bool, error) {
 	for i := range s.Data.Images {
 		if s.Data.Images[i].ID == img.ID {
-			var (
-				alias    string
-				favorite bool
-			)
-			alias = s.Data.Images[i].Alias
-			favorite = s.Data.Images[i].Favorite
+			alias := s.Data.Images[i].Alias
+			favorite := s.Data.Images[i].Favorite
+
 			s.Data.Images[i] = *img
 			s.Data.Images[i].Alias = alias
 			s.Data.Images[i].Favorite = favorite
-			s.Data.CurID = img.ID
-			if err := s.persist(); err != nil {
-				return fmt.Errorf("persisting data: %w", err)
-			}
-			return nil
+			return true, nil
 		}
 	}
+	return false, nil
+}
 
-	s.Data.Images = append(s.Data.Images, *img)
-	s.Data.CurID = img.ID
+func (s *JSONStore) save(img *Image, setActive bool) error {
+	up, _ := s.update(img)
+	if !up {
+		s.Data.Images = append(s.Data.Images, *img)
+	}
+
+	// Always set if requested or if the store previously had no active wallpaper
+	if setActive || s.Data.CurID == "" {
+		s.Data.CurID = img.ID
+	}
+
 	if err := s.persist(); err != nil {
 		return fmt.Errorf("persisting data: %w", err)
 	}
 	return nil
+}
+
+// Save inserts or updates the wallpaper and marks it as active (CurID).
+func (s *JSONStore) Save(img *Image) error {
+	return s.save(img, true)
+}
+
+// SaveNoActive inserts or updates the wallpaper metadata without shifting CurID
+// (unless the store was previously empty).
+func (s *JSONStore) SaveNoActive(img *Image) error {
+	return s.save(img, false)
 }
 
 func (s *JSONStore) Get(identifier string) (*Image, error) {
@@ -91,7 +106,7 @@ func (s *JSONStore) Get(identifier string) (*Image, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("image with ID or alias %q not found", identifier)
+	return nil, fmt.Errorf("%w: %q", ErrNotFound, identifier)
 }
 
 func (s *JSONStore) List(limit int, favs bool) ([]Image, error) {
@@ -138,7 +153,7 @@ func (s *JSONStore) Exists(id string) bool {
 
 func (s *JSONStore) Current() (*Image, error) {
 	if s.Data.CurID == "" {
-		return nil, fmt.Errorf("no current image set")
+		return nil, ErrEmptyStore
 	}
 	return s.Get(s.Data.CurID)
 }
@@ -148,7 +163,7 @@ func (s *JSONStore) Shift(step int, favs bool) (*Image, error) {
 		return s.Current()
 	}
 	if len(s.Data.Images) == 0 {
-		return nil, fmt.Errorf("no images in store")
+		return nil, ErrEmptyStore
 	}
 
 	currentIndex := len(s.Data.Images) - 1
@@ -163,7 +178,7 @@ func (s *JSONStore) Shift(step int, favs bool) (*Image, error) {
 
 	for newIndex := currentIndex + step; ; {
 		if newIndex < 0 || newIndex >= len(s.Data.Images) {
-			return nil, fmt.Errorf("shift out of bounds")
+			return nil, ErrOutOfBounds
 		}
 		if !favs || s.Data.Images[newIndex].Favorite {
 			s.Data.CurID = s.Data.Images[newIndex].ID

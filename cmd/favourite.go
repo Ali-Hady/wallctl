@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 
+	"github.com/Ali-Hady/wallctl/internal/core"
 	"github.com/spf13/cobra"
 )
 
@@ -19,20 +21,27 @@ var favouriteCmd = &cobra.Command{
 		if len(args) == 0 || args[0] == "current" {
 			currentImg, err := appStore.Current()
 			if err != nil {
-				return fmt.Errorf("failed to get current wallpaper: %w", err)
+				if errors.Is(err, core.ErrEmptyStore) {
+					fmt.Println("No wallpapers in history. Run 'wallctl fetch' first.")
+					return nil
+				}
+				return fmt.Errorf("getting current wallpaper: %w", err)
 			}
 			targetID = currentImg.ID
 		} else {
-			// Resolve by ID or existing alias to get the true ID
+			// Resolve by ID or existing alias
 			img, err := appStore.Get(args[0])
 			if err != nil {
-				return fmt.Errorf("wallpaper not found: %w", err)
+				if errors.Is(err, core.ErrNotFound) {
+					return fmt.Errorf("no wallpaper found matching %q (check 'wallctl history')", args[0])
+				}
+				return fmt.Errorf("resolving wallpaper %q: %w", args[0], err)
 			}
 			targetID = img.ID
 		}
 
 		if err := appStore.MarkFavorite(targetID, alias); err != nil {
-			return fmt.Errorf("failed to mark wallpaper as favorite: %w", err)
+			return fmt.Errorf("failed to mark favorite: %w", err)
 		}
 
 		if alias != "" {

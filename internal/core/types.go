@@ -22,8 +22,13 @@ type Source interface {
 	Fetch(ctx context.Context, dstDir string) (*Image, error)
 }
 
+type BatchSource interface {
+	FetchBatch(ctx context.Context, dstDir string, count int) ([]*Image, error)
+}
+
 type Store interface {
 	Save(img *Image) error
+	SaveNoActive(img *Image) error
 	Get(identifier string) (*Image, error)
 	List(limit int, favs bool) ([]Image, error)
 	MarkFavorite(id string, alias string) error

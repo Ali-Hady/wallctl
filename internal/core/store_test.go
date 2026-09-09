@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"path/filepath"
 	"testing"
 	"time"
@@ -210,5 +211,113 @@ func TestJSONStore_List_Favorites(t *testing.T) {
 	}
 	if limitedFavs[0].ID != "img3" {
 		t.Errorf("expected most recent favorite img3, got %s", limitedFavs[0].ID)
+	}
+}
+
+func TestJSONStore_SaveNoActive(t *testing.T) {
+	tmpDir := t.TempDir()
+	storePath := filepath.Join(tmpDir, "index.json")
+	store, _ := NewJSONStore(storePath)
+
+	// 1. First run fallback: when store is empty, SaveNoActive must anchor CurID
+	img1 := newSampleImage("img1")
+	if err := store.SaveNoActive(img1); err != nil {
+		t.Fatalf("unexpected error on initial SaveNoActive: %v", err)
+	}
+
+	curr, err := store.Current()
+	if err != nil {
+		t.Fatalf("expected CurID to be anchored on empty store, got error: %v", err)
+	}
+	if curr.ID != "img1" {
+		t.Errorf("expected initial CurID 'img1', got %q", curr.ID)
+	}
+
+	// 2. Subsequent SaveNoActive must append image but NOT alter CurID
+	img2 := newSampleImage("img2")
+	if err := store.SaveNoActive(img2); err != nil {
+		t.Fatalf("unexpected error on second SaveNoActive: %v", err)
+	}
+
+	curr, err = store.Current()
+	if err != nil {
+		t.Fatalf("unexpected error getting current: %v", err)
+	}
+	if curr.ID != "img1" {
+		t.Errorf("expected CurID to remain 'img1', but shifted to %q", curr.ID)
+	}
+
+	// Verify both images are stored in chronological order
+	if len(store.Data.Images) != 2 || store.Data.Images[1].ID != "img2" {
+		t.Fatalf("expected 2 images with img2 at index 1")
+	}
+}
+
+func TestJSONStore_Save_UpdatePreservesMetadata(t *testing.T) {
+	tmpDir := t.TempDir()
+	storePath := filepath.Join(tmpDir, "index.json")
+	store, _ := NewJSONStore(storePath)
+
+	img := newSampleImage("img1")
+	_ = store.Save(img)
+
+	// User customizes image
+	if err := store.MarkFavorite("img1", "custom-alias"); err != nil {
+		t.Fatalf("unexpected error setting favorite: %v", err)
+	}
+
+	// Re-fetch/save the same image with updated remote metadata
+	updatedImg := newSampleImage("img1")
+	updatedImg.Title = "Updated Title From API"
+	if err := store.Save(updatedImg); err != nil {
+		t.Fatalf("unexpected error updating image: %v", err)
+	}
+
+	// Ensure slice length did not increase (in-place update)
+	if len(store.Data.Images) != 1 {
+		t.Fatalf("expected exactly 1 image in store, got %d", len(store.Data.Images))
+	}
+
+	saved, err := store.Get("img1")
+	if err != nil {
+		t.Fatalf("failed to retrieve image: %v", err)
+	}
+
+	// Verify API updates were accepted
+	if saved.Title != "Updated Title From API" {
+		t.Errorf("expected title to update, got %q", saved.Title)
+	}
+
+	// Verify user-defined state was preserved
+	if !saved.Favorite {
+		t.Errorf("expected Favorite flag to remain true")
+	}
+	if saved.Alias != "custom-alias" {
+		t.Errorf("expected Alias to remain 'custom-alias', got %q", saved.Alias)
+	}
+}
+
+func TestJSONStore_SentinelErrors(t *testing.T) {
+	tmpDir := t.TempDir()
+	storePath := filepath.Join(tmpDir, "index.json")
+	store, _ := NewJSONStore(storePath)
+
+	// 1. Empty store checks
+	if _, err := store.Current(); !errors.Is(err, ErrEmptyStore) {
+		t.Errorf("expected ErrEmptyStore on empty store Current(), got %v", err)
+	}
+	if _, err := store.Shift(1, false); !errors.Is(err, ErrEmptyStore) {
+		t.Errorf("expected ErrEmptyStore on empty store Shift(), got %v", err)
+	}
+
+	// 2. Not found check
+	_ = store.Save(newSampleImage("img1"))
+	if _, err := store.Get("nonexistent"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("expected ErrNotFound for missing identifier, got %v", err)
+	}
+
+	// 3. Out of bounds check
+	if _, err := store.Shift(1, false); !errors.Is(err, ErrOutOfBounds) {
+		t.Errorf("expected ErrOutOfBounds shifting past boundary, got %v", err)
 	}
 }
