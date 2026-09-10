@@ -17,11 +17,26 @@ mkdir -p "$BIN_DIR"
 install -m 755 "$SERVICE_NAME" "$BIN_DIR/$SERVICE_NAME"
 rm -f "$SERVICE_NAME"
 
+echo "==> Checking for available wallpaper tools..."
+SETTERS=("swww" "hyprctl" "swaymsg" "swaybg" "wbg" "plasma-apply-wallpaperimage" "gsettings" "xfconf-query" "feh")
+FOUND=0
+for tool in "${SETTERS[@]}"; do
+  if command -v "$tool" >/dev/null 2>&1; then
+    FOUND=1
+    break
+  fi
+done
+
+if [[ $FOUND -eq 0 ]]; then
+  echo "Warning: No supported wallpaper tool detected (e.g. swww, hyprpaper, swaybg, feh)."
+  echo "         Please install one appropriate for your desktop environment."
+fi
+
 echo "==> Setting up systemd user units..."
 mkdir -p "$SYSTEMD_DIR"
 
 # Write systemd service file
-cat << EOF > "$SYSTEMD_DIR/$SERVICE_NAME.service"
+cat << 'EOF' > "$SYSTEMD_DIR/$SERVICE_NAME.service"
 [Unit]
 Description=Fetch and apply daily wallpaper via wallctl
 PartOf=graphical-session.target
@@ -29,15 +44,17 @@ After=graphical-session.target
 
 [Service]
 Type=oneshot
-Environment="PATH=$BIN_DIR:/usr/local/bin:/usr/bin:/bin"
-ExecStart=$BIN_DIR/$SERVICE_NAME fetch
+KillMode=process
+Environment="PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin"
+PassEnvironment=WAYLAND_DISPLAY DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE SWAYSOCK HYPRLAND_INSTANCE_SIGNATURE
+ExecStart=%h/.local/bin/wallctl fetch
 
 [Install]
 WantedBy=graphical-session.target
 EOF
 
 # Write systemd timer file
-cat << EOF > "$SYSTEMD_DIR/$SERVICE_NAME.timer"
+cat << 'EOF' > "$SYSTEMD_DIR/$SERVICE_NAME.timer"
 [Unit]
 Description=Daily trigger for wallctl
 
@@ -49,14 +66,18 @@ Persistent=true
 WantedBy=timers.target
 EOF
 
-echo "==> Reloading and enabling systemd timer..."
-systemctl --user daemon-reload
-systemctl --user enable --now "$SERVICE_NAME.timer"
+# Ensure systemd user session knows about the compositor environment if running live
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl --user import-environment WAYLAND_DISPLAY DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE SWAYSOCK HYPRLAND_INSTANCE_SIGNATURE 2>/dev/null || true
+  
+  echo "==> Reloading and enabling systemd timer..."
+  systemctl --user daemon-reload
+  systemctl --user enable --now "$SERVICE_NAME.timer"
+fi
 
 echo ""
 echo "Installation successful!"
 
-# Verify PATH
 if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
   echo "Notice: $BIN_DIR is not currently in your \$PATH."
   echo "Add the following line to your ~/.bashrc or ~/.zshrc:"
