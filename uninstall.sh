@@ -28,14 +28,28 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-echo "==> Stopping and disabling systemd timer & service..."
-systemctl --user disable --now "$SERVICE_NAME.timer" 2>/dev/null || true
-systemctl --user stop "$SERVICE_NAME.service" 2>/dev/null || true
+if command -v systemctl >/dev/null 2>&1; then
+  echo "==> Stopping and disabling systemd timer & service..."
+  systemctl --user disable --now "$SERVICE_NAME.timer" 2>/dev/null || true
+  systemctl --user stop "$SERVICE_NAME.service" 2>/dev/null || true
+fi
 
 echo "==> Removing systemd service and timer files..."
 rm -f "$SYSTEMD_DIR/$SERVICE_NAME.service"
 rm -f "$SYSTEMD_DIR/$SERVICE_NAME.timer"
-systemctl --user daemon-reload
+
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl --user daemon-reload
+  systemctl --user reset-failed "$SERVICE_NAME.service" "$SERVICE_NAME.timer" 2>/dev/null || true
+fi
+
+# Clean up standalone daemons that may have been spawned with KillMode=process
+for daemon in swaybg wbg swww-daemon; do
+  if pgrep -x "$daemon" >/dev/null 2>&1; then
+    echo "==> Stopping lingering $daemon instance..."
+    pkill -x "$daemon" 2>/dev/null || true
+  fi
+done
 
 echo "==> Removing binary from $BIN_DIR..."
 rm -f "$BIN_DIR/$SERVICE_NAME"
