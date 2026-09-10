@@ -44,8 +44,7 @@ if command -v systemctl >/dev/null 2>&1; then
 fi
 
 # Clean up standalone daemons that may have been spawned with KillMode=process
-# (Safe on KDE/GNOME where these binaries aren't running anyway)
-for daemon in swaybg wbg; do
+for daemon in swaybg wbg swww-daemon; do
   if pgrep -x "$daemon" >/dev/null 2>&1; then
     echo "==> Stopping lingering $daemon instance..."
     pkill -x "$daemon" 2>/dev/null || true

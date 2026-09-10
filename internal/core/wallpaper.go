@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -55,6 +56,7 @@ func hyprlandAttempts() []setterAttempt {
 			apply: func(p string) error {
 				if _, err := runCmd("swww", "query"); err != nil {
 					cmd := exec.Command("swww-daemon")
+					cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 					if err := cmd.Start(); err != nil {
 						return fmt.Errorf("starting swww-daemon: %w", err)
 					}
@@ -211,6 +213,7 @@ func SetDesktopWallpaper(imagePath string) error {
 				apply: func(p string) error {
 					_ = exec.Command("pkill", "-x", "swaybg").Run()
 					cmd := exec.Command("swaybg", "-i", p, "-m", "fill")
+					cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 					return cmd.Start()
 				},
 			},
@@ -220,6 +223,7 @@ func SetDesktopWallpaper(imagePath string) error {
 				apply: func(p string) error {
 					_ = exec.Command("pkill", "-x", "wbg").Run()
 					cmd := exec.Command("wbg", p)
+					cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 					return cmd.Start()
 				},
 			},
