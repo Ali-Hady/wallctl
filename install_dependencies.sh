@@ -57,11 +57,17 @@ install_native_packages() {
 }
 
 install_feh() {
+	if command -v feh &> /dev/null; then
+		return 0
+	fi
 	echo "Installing feh..."
 	install_native_packages feh
 }
 
 install_hyprpaper() {
+	if command -v hyprpaper &> /dev/null; then
+		return 0
+	fi
 	echo "Installing hyprpaper..."
 	if [[ $PACKAGE_MANAGER == "apt" ]]; then
 		sudo apt update
@@ -78,28 +84,35 @@ install_hyprpaper() {
 			cmake --build ./build --config Release --target hyprpaper -j$(nproc)
 			sudo cmake --install ./build
 		)
-		rm -rf $tmp_dir
+		rm -rf "$tmp_dir"
 	else
 		install_native_packages hyprpaper
 	fi
 }
 
 install_awww() {
-	echo "Installing awww..."
-
-	if ! command -v cargo &> /dev/null; then
-		curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-		source "$HOME/.cargo/env"
+	if command -v awww &> /dev/null; then
+		return 0
 	fi
 
-	local tmp_dir=$(mktemp -d)
-	git clone https://codeberg.org/LGFae/awww.git "$tmp_dir/awww"
-	(
-		cd "$tmp_dir/awww"
-		cargo build --release
-		sudo mv target/release/awww target/release/awww-daemon /usr/local/bin/
-	)
-	rm -rf $tmp_dir
+	echo "Installing awww..."
+	if [[ $PACKAGE_MANAGER == "pacman" ]]; then
+		install_native_packages awww
+	else
+		if ! command -v cargo &> /dev/null; then
+			curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+			source "$HOME/.cargo/env"
+		fi
+
+		local tmp_dir=$(mktemp -d)
+		git clone https://codeberg.org/LGFae/awww.git "$tmp_dir/awww"
+		(
+			cd "$tmp_dir/awww"
+			cargo build --release
+			sudo mv target/release/awww target/release/awww-daemon /usr/local/bin/
+		)
+		rm -rf "$tmp_dir"
+	fi
 }
 
 install_wallpaper_tools() {
