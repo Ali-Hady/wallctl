@@ -69,16 +69,20 @@ func hyprlandAttempts() []setterAttempt {
 		{
 			name: "hyprpaper",
 			available: func() bool {
-				return commandExists("hyprctl")
+				return commandExists("hyprpaper")
 			},
 			apply: func(p string) error {
-				if _, err := runCmd("hyprctl", "hyprpaper", "preload", p); err != nil {
-					return err
+			    if _, err := runCmd("hyprctl", "hyprpaper", "listactive"); err != nil {
+					cmd := exec.Command("hyprpaper")
+					cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+					if err := cmd.Start(); err != nil {
+					    return fmt.Errorf("starting hyprpaper: %w", err)
+					}
+					time.Sleep(250 * time.Millisecond)
 				}
 				if _, err := runCmd("hyprctl", "hyprpaper", "wallpaper", fmt.Sprintf(",%s", p)); err != nil {
 					return err
 				}
-				_, _ = runCmd("hyprctl", "hyprpaper", "unload", "all")
 				return nil
 			},
 		},
