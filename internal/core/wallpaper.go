@@ -49,20 +49,20 @@ func commandExists(name string) bool {
 func hyprlandAttempts() []setterAttempt {
 	return []setterAttempt{
 		{
-			name: "swww",
+			name: "awww",
 			available: func() bool {
-				return commandExists("swww")
+				return commandExists("awww")
 			},
 			apply: func(p string) error {
-				if _, err := runCmd("swww", "query"); err != nil {
-					cmd := exec.Command("swww-daemon")
+				if _, err := runCmd("awww", "query"); err != nil {
+					cmd := exec.Command("awww-daemon")
 					cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 					if err := cmd.Start(); err != nil {
-						return fmt.Errorf("starting swww-daemon: %w", err)
+						return fmt.Errorf("starting awww-daemon: %w", err)
 					}
 					time.Sleep(250 * time.Millisecond)
 				}
-				_, err := runCmd("swww", "img", p, "--transition-type", "fade")
+				_, err := runCmd("awww", "img", p, "--transition-type", "fade")
 				return err
 			},
 		},
