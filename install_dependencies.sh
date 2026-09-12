@@ -116,19 +116,41 @@ install_awww() {
 }
 
 install_wallpaper_tools() {
-	DESKTOP="${XDG_CURRENT_DESKTOP,,}"
-	SESSION_TYPE="${XDG_SESSION_TYPE,,}"
+    DESKTOP="${XDG_CURRENT_DESKTOP,,}"
+    SESSION_TYPE="${XDG_SESSION_TYPE,,}"
 
-	if [[ $SESSION_TYPE == *"wayland"* ]]; then
-		if [[ $DESKTOP == *"hyprland"* ]]; then
-			install_hyprpaper
-			install_awww
-		elif [[ $DESKTOP != *"sway"* ]]; then
-			install_awww
-		fi
-	elif [[ $SESSION_TYPE == *"x11"* && $DESKTOP != *"xfce"* ]]; then
-		install_feh
-	fi
+    case "$DESKTOP" in
+        *kde*|*plasma*)
+            # Plasma sets wallpaper natively (X11 or Wayland) via
+            # plasma-apply-wallpaperimage — nothing to install
+            return
+            ;;
+        *gnome*|*cinnamon*|*budgie*)
+            # gsettings-based, already present
+            return
+            ;;
+        *xfce*)
+            # xfconf-query is native to XFCE, already present
+            return
+            ;;
+    esac
+
+    if [[ $SESSION_TYPE == *"wayland"* ]]; then
+        case "$DESKTOP" in
+            *hyprland*)
+                install_hyprpaper
+				install_awww
+                ;;
+            *sway*)
+				install_awww
+                ;;
+            *)
+                install_awww
+                ;;
+        esac
+    elif [[ $SESSION_TYPE == *"x11"* ]]; then
+        install_feh
+    fi
 }
 
 main() {
