@@ -69,11 +69,14 @@ EOF
 # Ensure systemd user session knows about the compositor environment if running live
 if command -v systemctl >/dev/null 2>&1; then
   systemctl --user import-environment WAYLAND_DISPLAY DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE SWAYSOCK HYPRLAND_INSTANCE_SIGNATURE 2>/dev/null || true
-  
+
   echo "==> Reloading and enabling systemd timer..."
   systemctl --user daemon-reload
   systemctl --user enable --now "$SERVICE_NAME.timer"
 fi
+
+echo "==> Installing all needed wallpaper tools..."
+./install_dependencies.sh
 
 echo ""
 echo "Installation successful!"
