@@ -47,6 +47,7 @@ Type=oneshot
 KillMode=process
 Environment="PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin"
 PassEnvironment=WAYLAND_DISPLAY DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE SWAYSOCK HYPRLAND_INSTANCE_SIGNATURE
+ExecStartPre=/bin/sleep 300
 ExecStart=%h/.local/bin/wallctl fetch
 
 [Install]
