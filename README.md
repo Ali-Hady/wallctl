@@ -4,6 +4,10 @@ A lightweight, zero-dependency Linux wallpaper manager written in Go. `wallctl` 
 
 ---
 
+## Demo
+
+---
+
 ## Features
 
 - **Zero Desktop Wrapper Fluff**: Eliminates flaky DBus script wrappers and third-party bindings. Interacts directly with native tools across KDE Plasma, GNOME, Sway, Hyprland, XFCE, and X11 standalone window managers.
@@ -11,7 +15,7 @@ A lightweight, zero-dependency Linux wallpaper manager written in Go. `wallctl` 
 - **Bi-directional Navigation**: Move forward (`next`) and backward (`back`) through downloaded wallpapers without re-downloading.
 - **Favorites & Aliases**: Tag wallpapers as favorites and assign memorable aliases to quickly apply them by name.
 - **Atomic Local Persistence**: Metadata and state are saved in a clean, human-readable JSON store with atomic file operations to prevent corruption.
-- **Native Automation**: Ships with automated `systemd` user service and timer integration to fetch daily wallpapers on schedule.
+- **Native Automation**: Ships with automated `systemd` user service and timer integration to fetch daily wallpapers on schedule, with automatic detection (and installation) of the right wallpaper-setting tool for your session.
 
 ---
 
@@ -24,7 +28,7 @@ A lightweight, zero-dependency Linux wallpaper manager written in Go. `wallctl` 
 | **KDE Plasma** (Kubuntu, Fedora KDE, Arch) | `plasma-apply-wallpaperimage` | Official Plasma CLI (Wayland & X11) |
 | **GNOME / Cinnamon / Budgie** | `gsettings` | Sets both Light and Dark mode (`picture-uri-dark`) |
 | **Hyprland** | `swww` or `hyprctl hyprpaper` | Detects running Wayland wallpaper daemons |
-| **Sway** | `swaymsg` | Native Wayland output IPC |
+| **Sway** | `swaymsg`, `swaybg`, or `wbg` | Native Wayland output IPC |
 | **XFCE** | `xfconf-query` | Native XFCE backdrop configuration |
 | **X11 Standalone WMs** (i3, bspwm, etc.) | `feh` | Standard `--bg-fill` fallback |
 
@@ -59,13 +63,19 @@ chmod +x install.sh uninstall.sh
 
 1. Compiles the binary with stripped debug symbols (`-ldflags="-s -w"`).
 2. Installs the executable to `~/.local/bin/wallctl`.
-3. Sets up a `systemd` user service (`~/.config/systemd/user/wallctl.service`) and a daily timer (`~/.config/systemd/user/wallctl.timer`) scheduled to run every day at 09:00 AM.
-4. Enables and activates the timer automatically.
+3. Checks whether a supported wallpaper-setting tool (`swww`, `hyprctl`, `swaymsg`, `swaybg`, `wbg`, `plasma-apply-wallpaperimage`, `gsettings`, `xfconf-query`, `feh`) is already available, and warns if none are found.
+4. Sets up a `systemd` user service (`~/.config/systemd/user/wallctl.service`) and a daily timer (`~/.config/systemd/user/wallctl.timer`):
+   - The service passes through session environment variables (`WAYLAND_DISPLAY`, `DISPLAY`, `XDG_CURRENT_DESKTOP`, `XDG_SESSION_TYPE`, `SWAYSOCK`, `HYPRLAND_INSTANCE_SIGNATURE`) so it can correctly reach your compositor/session when triggered by systemd.
+   - It waits 5 minutes after being started (`ExecStartPre=/bin/sleep 300`) before fetching, to avoid racing your desktop session on login/boot.
+   - The timer runs daily at **09:00 AM** (`Persistent=true`, so a missed run fires as soon as the session is next active).
+5. Imports the current compositor/session environment into the systemd user session (`systemctl --user import-environment ...`), then reloads and enables the timer.
+6. Runs `./install_dependencies.sh` to install whichever native wallpaper-setting tool(s) your desktop environment needs.
 
 > **Note**: Ensure `~/.local/bin` is in your `$PATH`. If not, add the following to your `~/.bashrc` or `~/.zshrc`:
 > ```bash
 > export PATH="$HOME/.local/bin:$PATH"
 > ```
+> The installer will remind you of this at the end if it detects `~/.local/bin` isn't already on your `$PATH`.
 
 ---
 
