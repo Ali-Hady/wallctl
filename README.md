@@ -29,8 +29,8 @@ https://github.com/user-attachments/assets/3761d7cb-153e-4804-9b49-38872aacc650
 | :--- | :--- | :--- |
 | **KDE Plasma** (Kubuntu, Fedora KDE, Arch) | `plasma-apply-wallpaperimage` | Official Plasma CLI (Wayland & X11) |
 | **GNOME / Cinnamon / Budgie** | `gsettings` | Sets both Light and Dark mode (`picture-uri-dark`) |
-| **Hyprland** | `swww` or `hyprctl hyprpaper` | Detects running Wayland wallpaper daemons |
-| **Sway** | `swaymsg`, `swaybg`, or `wbg` | Native Wayland output IPC |
+| **Hyprland** | `hyprpaper` and/or `awww` | Both are installed automatically; whichever daemon is running is used |
+| **Sway / other wlroots compositors** | `awww` | Installed automatically if missing |
 | **XFCE** | `xfconf-query` | Native XFCE backdrop configuration |
 | **X11 Standalone WMs** (i3, bspwm, etc.) | `feh` | Standard `--bg-fill` fallback |
 
@@ -71,13 +71,35 @@ chmod +x install.sh uninstall.sh
    - It waits 5 minutes after being started (`ExecStartPre=/bin/sleep 300`) before fetching, to avoid racing your desktop session on login/boot.
    - The timer runs daily at **09:00 AM** (`Persistent=true`, so a missed run fires as soon as the session is next active).
 5. Imports the current compositor/session environment into the systemd user session (`systemctl --user import-environment ...`), then reloads and enables the timer.
-6. Runs `./install_dependencies.sh` to install whichever native wallpaper-setting tool(s) your desktop environment needs.
+6. Runs `./install_dependencies.sh` to install whichever native wallpaper-setting tool(s) your desktop environment needs (see below).
 
 > **Note**: Ensure `~/.local/bin` is in your `$PATH`. If not, add the following to your `~/.bashrc` or `~/.zshrc`:
 > ```bash
 > export PATH="$HOME/.local/bin:$PATH"
 > ```
 > The installer will remind you of this at the end if it detects `~/.local/bin` isn't already on your `$PATH`.
+
+### Automatic Dependency Installation (`install_dependencies.sh`)
+
+Invoked automatically at the end of `install.sh`, this script figures out what (if anything) needs to be installed for your session and does it for you:
+
+1. **Detects your package manager** from `/etc/os-release`:
+   - `ID=ubuntu` or `ID=debian` → `apt`
+   - `ID=fedora` → `dnf`
+   - `ID=arch` → `pacman`
+   - If `ID` itself isn't one of the above, it falls back to scanning `ID_LIKE` for an Arch-, Debian/Ubuntu-, or Fedora/RHEL-based match (covers most derivative distros).
+2. **Skips installation entirely** on desktops that already ship their own setter — KDE/Plasma, GNOME/Cinnamon/Budgie, and XFCE — since nothing extra is needed there.
+3. Otherwise, chooses what to install based on `$XDG_CURRENT_DESKTOP` and `$XDG_SESSION_TYPE`:
+   - **Hyprland**: installs both `hyprpaper` and `awww`.
+   - **Sway**: installs `awww`.
+   - **Any other Wayland session**: installs `awww`.
+   - **X11**: installs `feh`.
+4. Each tool is checked first and skipped if already present (`command -v`), so re-running the installer won't reinstall anything:
+   - `feh` — installed via your native package manager.
+   - `hyprpaper` — installed via `pacman` on Arch; on apt/dnf systems it's built from source instead (clones `hyprwm/hyprpaper`, installs the required `-dev` build packages, and compiles with CMake).
+   - `awww` — installed via `pacman` on Arch; on apt/dnf systems it's built from source with Cargo (installing `rustup` first if Rust isn't already present) from `LGFae/awww` on Codeberg.
+
+> **Heads up**: on non-Arch systems, provisioning `hyprpaper`/`awww` compiles them from source (via CMake or Cargo), so first-run installs on Hyprland/Sway/other wlroots sessions will take noticeably longer and will prompt for your `sudo` password.
 
 ---
 
