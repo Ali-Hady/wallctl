@@ -6,6 +6,8 @@ A lightweight, zero-dependency Linux wallpaper manager written in Go. `wallctl` 
 
 ## Demo
 
+https://github.com/user-attachments/assets/3761d7cb-153e-4804-9b49-38872aacc650
+
 ---
 
 ## Features
