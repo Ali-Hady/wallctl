@@ -40,36 +40,31 @@ var fetchCmd = &cobra.Command{
 
 			// Bing returns [Today, Yesterday, ..., 7 days ago].
 			// We iterate in REVERSE so oldest is saved first, and newest (index 0) is saved last.
-			for i := len(images) - 1; i >= 0; i-- {
-				img := images[i]
-
-				// If it's not the latest image, never set it as active CurID
-				// If it is the latest image, only set as CurID if !noSet
-				isNewest := (i == 0)
-				shouldActivate := isNewest && !noSet
-
-				var saveErr error
-				if shouldActivate {
-					saveErr = appStore.Save(img)
-				} else {
-					saveErr = appStore.SaveNoActive(img)
-				}
-
-				if saveErr != nil {
-					return fmt.Errorf("failed to save image %s: %w", img.ID, saveErr)
+			// Save older images (never active)
+			for i := len(images) - 1; i >= 1; i-- {
+				if err := appStore.SaveNoActive(images[i]); err != nil {
+					return fmt.Errorf("failed to save image %s: %w", images[i].ID, err)
 				}
 			}
 
 			newestImg := images[0]
 
 			if noSet {
+				if err := appStore.SaveNoActive(newestImg); err != nil {
+					return fmt.Errorf("failed to save image %s: %w", newestImg.ID, err)
+				}
 				fmt.Printf("Downloaded %d wallpapers to cache (desktop not modified).\n", len(images))
 				return nil
 			}
 
 			fmt.Printf("Setting latest (%q) as wallpaper...\n", newestImg.Title)
 			if err := core.SetDesktopWallpaper(newestImg.LocalPath); err != nil {
+				appStore.SaveNoActive(newestImg) // Do not mark as active if setting failed
 				return fmt.Errorf("failed to apply wallpaper: %w", err)
+			}
+
+			if err := appStore.Save(newestImg); err != nil {
+				return fmt.Errorf("failed to save image %s: %w", newestImg.ID, err)
 			}
 			fmt.Println("Wallpaper applied successfully!")
 			return nil
@@ -90,13 +85,15 @@ var fetchCmd = &cobra.Command{
 			return nil
 		}
 
-		if err := appStore.Save(img); err != nil {
-			return fmt.Errorf("failed to save wallpaper metadata: %w", err)
-		}
-
 		fmt.Printf("Setting %q as wallpaper...\n", img.Title)
 		if err := core.SetDesktopWallpaper(img.LocalPath); err != nil {
+			// Do not mark as active if setting failed
+			appStore.SaveNoActive(img)
 			return fmt.Errorf("failed to set wallpaper: %w", err)
+		}
+
+		if err := appStore.Save(img); err != nil {
+			return fmt.Errorf("failed to save wallpaper metadata: %w", err)
 		}
 
 		fmt.Println("Wallpaper applied successfully!")
