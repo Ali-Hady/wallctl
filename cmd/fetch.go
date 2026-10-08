@@ -103,6 +103,6 @@ var fetchCmd = &cobra.Command{
 
 func init() {
 	fetchCmd.Flags().BoolVarP(&noSet, "no-set", "n", false, "Download without setting as desktop background")
-	fetchCmd.Flags().IntVarP(&count, "count", "c", 1, "Number of past wallpapers to fetch (if supported by source)")
+	fetchCmd.Flags().IntVarP(&count, "count", "c", 7, "Number of past wallpapers to fetch (if supported by source)")
 	rootCmd.AddCommand(fetchCmd)
 }
