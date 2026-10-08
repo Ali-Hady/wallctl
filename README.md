@@ -16,6 +16,7 @@ https://github.com/user-attachments/assets/3761d7cb-153e-4804-9b49-38872aacc650
 - **Smart History & Batch Seeding**: Automatically seeds your local library with recent historical wallpapers on your very first run.
 - **Bi-directional Navigation**: Move forward (`next`) and backward (`back`) through downloaded wallpapers without re-downloading.
 - **Favorites & Aliases**: Tag wallpapers as favorites and assign memorable aliases to quickly apply them by name.
+- **Configurable Behavior**: Easily toggle automated behavior (like applying wallpapers on fetch) via a built-in configuration CLI.
 - **Atomic Local Persistence**: Metadata and state are saved in a clean, human-readable JSON store with atomic file operations to prevent corruption.
 - **Native Automation**: Ships with automated `systemd` user service and timer integration to fetch daily wallpapers on schedule, with automatic detection (and installation) of the right wallpaper-setting tool for your session.
 
@@ -120,7 +121,26 @@ wallctl fetch --count 5
 wallctl fetch --no-set
 ```
 
-### 2. Navigate History
+### 2. Configuration (`config`)
+
+Inspect and manage persistent settings stored in your configuration:
+
+```bash
+# Check if new wallpapers are set automatically on fetch
+wallctl config get set-on-fetch
+
+# Enable auto-setting on fetch (default)
+wallctl config set set-on-fetch true
+
+# Disable auto-setting on fetch (downloads to cache only)
+wallctl config set set-on-fetch false
+```
+
+| Key | Values | Description |
+| :--- | :--- | :--- |
+| `set-on-fetch` | `true`, `false` | When `true`, `wallctl fetch` automatically applies the latest image to your desktop background. Can be overridden per-command using the `--no-set` flag. |
+
+### 3. Navigate History
 
 Step through your cached catalog chronologically:
 
@@ -136,7 +156,7 @@ wallctl back --favs
 wallctl next --favs
 ```
 
-### 3. Favorites & Aliases
+### 4. Favorites & Aliases
 
 Bookmark wallpapers so you can jump back to them:
 
@@ -151,7 +171,7 @@ wallctl favourite current --alias hero
 wallctl favourite 20260909-bing --alias sunset
 ```
 
-### 4. Direct Selection
+### 5. Direct Selection
 
 Apply any cached wallpaper directly by its ID or assigned alias:
 
@@ -163,7 +183,7 @@ wallctl set hero
 wallctl set 20260908-bing
 ```
 
-### 5. Inspect History
+### 6. Inspect History
 
 List cached wallpapers along with their IDs, dates, titles, and favorite status:
 
