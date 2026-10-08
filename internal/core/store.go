@@ -8,8 +8,9 @@ import (
 )
 
 type Data struct {
-	CurID  string  `json:"current_id"`
-	Images []Image `json:"images"`
+	CurID    string  `json:"current_id"`
+	SetOnNew bool    `json:"set_on_new"`
+	Images   []Image `json:"images"`
 }
 
 type JSONStore struct {
@@ -50,6 +51,18 @@ func (s *JSONStore) persist() error {
 	}
 
 	return nil
+}
+
+func (s *JSONStore) ChangeSetOnNew(state bool) error {
+	s.Data.SetOnNew = state
+	if err := s.persist(); err != nil {
+		return fmt.Errorf("persisting data: %w", err)
+	}
+	return nil
+}
+
+func (s *JSONStore) GetSetOnNew() bool {
+	return s.Data.SetOnNew
 }
 
 func (s *JSONStore) update(img *Image) (bool, error) {
@@ -198,7 +211,9 @@ func NewJSONStore(filePath string) (*JSONStore, error) {
 		if os.IsNotExist(err) {
 			return &JSONStore{
 				FilePath: filePath,
-				Data:     &Data{},
+				Data: &Data{
+					SetOnNew: true,
+				},
 			}, nil
 		}
 		return nil, fmt.Errorf("reading store file: %w", err)

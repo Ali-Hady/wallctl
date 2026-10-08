@@ -16,10 +16,17 @@ var fetchCmd = &cobra.Command{
 	Use:   "fetch",
 	Short: "Fetch and apply wallpapers",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// 1. Resolve whether to apply wallpaper
+		// Defaults to stored config unless user explicitly passes --no-set
+		applyWallpaper := appStore.GetSetOnNew()
+		if cmd.Flags().Changed("no-set") {
+			applyWallpaper = !noSet
+		}
+
 		history, _ := appStore.List(1, false)
 		isFirstRun := len(history) == 0
 
-		// Check if current source supports batching
+		// 2. Batch fetch logic
 		if batcher, ok := appSource.(core.BatchSource); ok && (isFirstRun || count > 1) {
 			batchCount := count
 			if isFirstRun && batchCount <= 1 {
@@ -39,8 +46,7 @@ var fetchCmd = &cobra.Command{
 			}
 
 			// Bing returns [Today, Yesterday, ..., 7 days ago].
-			// We iterate in REVERSE so oldest is saved first, and newest (index 0) is saved last.
-			// Save older images (never active)
+			// Save older images in reverse so newest (index 0) is saved last.
 			for i := len(images) - 1; i >= 1; i-- {
 				if err := appStore.SaveNoActive(images[i]); err != nil {
 					return fmt.Errorf("failed to save image %s: %w", images[i].ID, err)
@@ -49,7 +55,7 @@ var fetchCmd = &cobra.Command{
 
 			newestImg := images[0]
 
-			if noSet {
+			if !applyWallpaper {
 				if err := appStore.SaveNoActive(newestImg); err != nil {
 					return fmt.Errorf("failed to save image %s: %w", newestImg.ID, err)
 				}
@@ -59,7 +65,7 @@ var fetchCmd = &cobra.Command{
 
 			fmt.Printf("Setting latest (%q) as wallpaper...\n", newestImg.Title)
 			if err := core.SetDesktopWallpaper(newestImg.LocalPath); err != nil {
-				appStore.SaveNoActive(newestImg) // Do not mark as active if setting failed
+				appStore.SaveNoActive(newestImg)
 				return fmt.Errorf("failed to apply wallpaper: %w", err)
 			}
 
@@ -70,14 +76,14 @@ var fetchCmd = &cobra.Command{
 			return nil
 		}
 
-		// Standard single fetch fallback
+		// 3. Single fetch fallback
 		fmt.Println("Fetching latest wallpaper...")
 		img, err := appSource.Fetch(cmd.Context(), imagesDir)
 		if err != nil {
 			return fmt.Errorf("failed to fetch wallpaper: %w", err)
 		}
 
-		if noSet {
+		if !applyWallpaper {
 			if err := appStore.SaveNoActive(img); err != nil {
 				return fmt.Errorf("failed to save wallpaper metadata: %w", err)
 			}
@@ -87,7 +93,6 @@ var fetchCmd = &cobra.Command{
 
 		fmt.Printf("Setting %q as wallpaper...\n", img.Title)
 		if err := core.SetDesktopWallpaper(img.LocalPath); err != nil {
-			// Do not mark as active if setting failed
 			appStore.SaveNoActive(img)
 			return fmt.Errorf("failed to set wallpaper: %w", err)
 		}
@@ -102,7 +107,8 @@ var fetchCmd = &cobra.Command{
 }
 
 func init() {
+	// Set default to false and 1 so it doesn't break single-fetch mode or panic on uninitialized appStore
 	fetchCmd.Flags().BoolVarP(&noSet, "no-set", "n", false, "Download without setting as desktop background")
-	fetchCmd.Flags().IntVarP(&count, "count", "c", 7, "Number of past wallpapers to fetch (if supported by source)")
+	fetchCmd.Flags().IntVarP(&count, "count", "c", 1, "Number of past wallpapers to fetch (if supported by source)")
 	rootCmd.AddCommand(fetchCmd)
 }
